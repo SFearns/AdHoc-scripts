@@ -122,7 +122,12 @@ function Convert-Passwords {
 		# Using a SQLite Database
 
 		# Define The SQLiteDB filename variable
-		$SQLiteDB = ".\$($OutputFile)"
+		if ($OutputFile.Substring(1).StartsWith(":\")) {
+			# Starts with a drive letter
+			$SQLiteDB = "$($OutputFile)"
+		} else {
+			$SQLiteDB = ".\$($OutputFile)"
+		}
 
 		# Does the Database need to be created?
 		if (($TRUE -eq $Overwrite) -or !(Test-Path $OutputFile)) {
@@ -143,6 +148,11 @@ function Convert-Passwords {
 			}			
 		} else {
 			"Using existing SQLite Database: $($OutputFile)"
+		}
+
+		# Make sure the Database exists
+		if (!(Test-Path $OutputFile)) {
+			"ERROR: Missing Database $($OutputFile)"
 		}
 	} else {
 		# Using a CSV file
