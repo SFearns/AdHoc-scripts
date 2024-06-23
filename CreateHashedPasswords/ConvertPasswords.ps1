@@ -19,8 +19,9 @@ function Convert-Passwords {
 
 		There are 5 parameters of which the -InputFile is a requirement.
 
-		This script depends on PSSQLite from
-		    https://github.com/RamblingCookieMonster/PSSQLite
+		This script depends on:
+			DSInternals from https://github.com/MichaelGrafnetter/DSInternals
+		    PSSQLite    from https://github.com/RamblingCookieMonster/PSSQLite
 
     .PARAMETER InputFile
         The password file to process.
