@@ -2,7 +2,6 @@
 ## Copyright 2024  Stephen Fearns
 ##################################################################
 
-
 # Load the PowerShell SQLite module
 Import-Module PSSQLite
 Import-Module DSInternals
@@ -29,7 +28,7 @@ function Convert-Passwords {
 		Note:
 		Each line is considered to be the password 
 
-    .PARAMETER OutputFile
+    .PARAMETER SQLiteDatabase
         This is the filename of the output file.
 
 		If left blank then:
@@ -63,19 +62,26 @@ function Convert-Passwords {
 		Notes:
 		The LMHASH function doesn't support Unicode characters and will produce an error
 
-    .PARAMETER ProgressBar
+    .PARAMETER HideProgressBar
 		This switch is either $TRUE or $FALSE.
 
 		$TRUE  will show a progress bar
 		$FALSE will not show a progress bar
 
-		Default value:	$TRUE
+		Default value:	$FALSE
 
-    .PARAMETER OutputDB
+    .PARAMETER OutputCSV
 		This switch is either $TRUE or $FALSE.
 
 		$TRUE  will output the data into a CSV file
 		$FALSE will output the data into a SQLite Database
+
+		Default value:	$FALSE
+
+    .PARAMETER Verbose
+		This switch is either $TRUE or $FALSE.
+
+		Will work in the normal way but not fully implemented yet
 
 		Default value:	$FALSE
 
@@ -315,7 +321,7 @@ function Find-Passwords {
         This function uses a SQLite Database to seach for LM & NT Hash values and if found displays the password(s).
 
     .DESCRIPTION
-		TBC
+		Find the password that matches the Hash using a SQLite DB
 
 		This script depends on:
 		  DSInternals from https://github.com/MichaelGrafnetter/DSInternals
@@ -323,12 +329,12 @@ function Find-Passwords {
 
     .PARAMETER InputFile
         This file is the human readable dump file containing (in this order):
-		Username
-		UID
-		LMHash
-		NTHash
-		<unknown>
-		<unknown>
+			Username
+			UID
+			LMHash
+			NTHash
+			<unknown>
+			<unknown>
 
 		Each field is seperated with a colon ( : )
 
