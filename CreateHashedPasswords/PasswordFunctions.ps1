@@ -163,15 +163,37 @@ function Convert-Passwords {
                 Remove-Item -Path $SQLiteDatabase -Force | Out-Null
             }
 
-			$Query = "CREATE TABLE HashedPasswords (Password TEXT PRIMARY KEY, LMHash TEXT KEY, NTHash TEXT KEY)"
-
+			# Create the tables with the required fields
+			$Query = "CREATE TABLE HashedPasswords (Password TEXT, LMHash TEXT, NTHash TEXT)"
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
                 "Created: $($SQLiteDB)"
 			}
-			catch {
-				throw "ERROR: Unable to create $($SQLiteDB)"
-			}			
+			catch {throw "ERROR: Unable to create $($SQLiteDB)"}	
+
+			# Create a UNIQUE Index for the clear-text password
+			$Query = 'CREATE UNIQUE INDEX "Password" ON HashedPasswords ("Password" ASC)'
+			try {
+				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+                "Created: $($SQLiteDB)"
+			}
+			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
+
+			# Create a UNIQUE Index for the clear-text password
+			$Query = 'CREATE INDEX "NTHash" ON HashedPasswords ("NTHash" ASC)'
+			try {
+				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+                "Created: $($SQLiteDB)"
+			}
+			catch {throw "ERROR: Unable to Index for NTHash -- $($SQLiteDB)"}	
+			
+			# Create a UNIQUE Index for the clear-text password
+			$Query = 'CREATE INDEX "LMHash" ON HashedPasswords ("LMHash" ASC)'
+			try {
+				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+                "Created: $($SQLiteDB)"
+			}
+			catch {throw "ERROR: Unable to Index for LMHash -- $($SQLiteDB)"}	
 		} else {
 			"Using existing SQLite Database: $($SQLiteDatabase)"
 		}
