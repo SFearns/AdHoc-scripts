@@ -167,7 +167,7 @@ function Convert-Passwords {
 			$Query = 'CREATE TABLE "HashedPasswords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "LMHash" TEXT KEY, "NTHash" TEXT KEY, PRIMARY KEY("ID" AUTOINCREMENT));'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB)"
+                "Created: $($SQLiteDB) - Table"
 			}
 			catch {throw "ERROR: Unable to create $($SQLiteDB)"}	
 
@@ -175,7 +175,7 @@ function Convert-Passwords {
 			$Query = 'CREATE UNIQUE INDEX "ID" ON "HashedPasswords" ("ID" ASC);'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB)"
+                "Created: $($SQLiteDB) - Index for ID"
 			}
 			catch {throw "ERROR: Unable to UNIQUE Index for ID -- $($SQLiteDB)"}	
 
@@ -183,7 +183,7 @@ function Convert-Passwords {
 			$Query = 'CREATE UNIQUE INDEX "Password" ON HashedPasswords ("Password" ASC)'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB)"
+                "Created: $($SQLiteDB) - Index for Password"
 			}
 			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
 
@@ -191,7 +191,7 @@ function Convert-Passwords {
 			$Query = 'CREATE INDEX "NTHash" ON HashedPasswords ("NTHash" ASC)'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB)"
+                "Created: $($SQLiteDB) - Index for NTHash"
 			}
 			catch {throw "ERROR: Unable to Index for NTHash -- $($SQLiteDB)"}	
 			
@@ -199,7 +199,7 @@ function Convert-Passwords {
 			$Query = 'CREATE INDEX "LMHash" ON HashedPasswords ("LMHash" ASC)'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB)"
+                "Created: $($SQLiteDB) - Index for LMHash"
 			}
 			catch {throw "ERROR: Unable to Index for LMHash -- $($SQLiteDB)"}	
 		} else {
@@ -235,6 +235,11 @@ function Convert-Passwords {
 	$InputFileWithPath = (Get-ChildItem $InputFile).FullName
 	ForEach ($Password in [System.IO.File]::ReadLines($InputFileWithPath))
 	{
+		# Remove non ISO-8859-1 characters
+		# $Password = $Password  -replace '\P{IsBasicLatin}'	# [^\p{IsBasicLatin}\p{IsLatin-1Supplement}]')
+		# $Password = $Password  -replace '[^\p{IsBasicLatin}\p{IsLatin-1Supplement}]'
+		$Password = $Password -replace '[^^\x30-\x39\x41-\x5A\x61-\x7A]+'
+
 		# Reset temporary variables
 		$SkipEntry   = $FALSE
 		$NTHashError = $FALSE
