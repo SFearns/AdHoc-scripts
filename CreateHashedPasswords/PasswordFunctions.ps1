@@ -177,7 +177,7 @@ function Convert-Passwords {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
                 "Created: $($SQLiteDB)"
 			}
-			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
+			catch {throw "ERROR: Unable to UNIQUE Index for ID -- $($SQLiteDB)"}	
 
 			# Create a UNIQUE Index for the clear-text password
 			$Query = 'CREATE UNIQUE INDEX "Password" ON HashedPasswords ("Password" ASC)'
