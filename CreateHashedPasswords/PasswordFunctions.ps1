@@ -164,12 +164,20 @@ function Convert-Passwords {
             }
 
 			# Create the tables with the required fields
-			$Query = "CREATE TABLE HashedPasswords (Password TEXT, LMHash TEXT, NTHash TEXT)"
+			$Query = 'CREATE TABLE "HashedPasswords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "LMHash" TEXT KEY, "NTHash" TEXT KEY, PRIMARY KEY("ID" AUTOINCREMENT));'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
                 "Created: $($SQLiteDB)"
 			}
 			catch {throw "ERROR: Unable to create $($SQLiteDB)"}	
+
+			# Create the index for the ID field
+			$Query = 'CREATE UNIQUE INDEX "ID" ON "HashedPasswords" ("ID" ASC);'
+			try {
+				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+                "Created: $($SQLiteDB)"
+			}
+			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
 
 			# Create a UNIQUE Index for the clear-text password
 			$Query = 'CREATE UNIQUE INDEX "Password" ON HashedPasswords ("Password" ASC)'
