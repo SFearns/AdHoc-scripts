@@ -6,6 +6,8 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
+Write-Host "`nPassword Functions  v2024-08-11"
+
 function Convert-Passwords {
 <#
     .SYNOPSIS
@@ -93,26 +95,25 @@ function Convert-Passwords {
 		Progress information is output to the screen (which can be re-directed)
 
     .EXAMPLE
-        Convert_passwords_to_hashes.ps1 -InputFile "passwords.txt"
+        Convert-Passwords -InputFile "passwords.txt" -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar
 
     .LINK
         Links to further documentation isn't enabled.
 
     .NOTES
-		Error trapping from the 3rd party module isn't possible
-
+		Error trapping from the 3rd party modules still needs work
 #>
 
 	Param (
 		[string]$InputFile = $(throw "-InputFile is required."),
 		[string]$SQLiteDatabase = "HashedPasswords.SQLite",
-		[switch]$Verbose = $FALSE,
-		[switch]$OutputCSV = $FALSE,
-		[switch]$Overwrite = $FALSE,
-		[switch]$LMHash = $TRUE,
-		[switch]$NTHash = $TRUE,
-		[switch]$LogFile = $FALSE,
-		[switch]$ShowProgressBar = $FALSE
+		[switch]$Verbose = $false,
+		[switch]$OutputCSV = $false,
+		[switch]$Overwrite = $false,
+		[switch]$LMHash = $true,
+		[switch]$NTHash = $true,
+		[switch]$LogFile = $false,
+		[switch]$ShowProgressBar = $false
 	)
 
 	# Record old Verbose setting
@@ -126,7 +127,7 @@ function Convert-Passwords {
 	"Started: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Started.Year, $Started.Month, $Started.Day, $Started.Hour, $Started.Minute, $Started.Second
 
 	# Password Log filename
-	if ($TRUE -eq $LogFile) {
+	if ($LogFile) {
 		$PasswordLog = "$($InputFile).log"
 		if (Test-Path $PasswordLog) {
 			if ($PasswordLog.StartsWith('.\')) {$PasswordLog = $PasswordLog.Substring(2)}
@@ -164,7 +165,7 @@ function Convert-Passwords {
             }
 
 			# Create the tables with the required fields
-			$Query = 'CREATE TABLE "HashedPasswords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "LMHash" TEXT KEY, "NTHash" TEXT KEY, PRIMARY KEY("ID" AUTOINCREMENT));'
+			$Query = 'CREATE TABLE "HashedPasswords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "PasswordLength" INTEGER, "LMHash" TEXT KEY, "NTHash" TEXT KEY, PRIMARY KEY("ID" AUTOINCREMENT));'
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
                 "Created: $($SQLiteDB) - Table"
@@ -184,6 +185,14 @@ function Convert-Passwords {
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
                 "Created: $($SQLiteDB) - Index for Password"
+			}
+			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
+
+			# Create a UNIQUE Index for the clear-text password
+			$Query = 'CREATE INDEX "PasswordLength" ON HashedPasswords ("PasswordLength" ASC)'
+			try {
+				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+                "Created: $($SQLiteDB) - Index for PasswordLength"
 			}
 			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
 
@@ -229,15 +238,18 @@ function Convert-Passwords {
 
 	# Used by the Status Bar
 	$PasswordsProgressed = 0
+	$PasswordsAdded = 0
 	$BytesProcessed = 0
+	if ($InputFileSize -lt 1GB) {$InputFileSizeStr = "{0:n} MB" -f ($InputFileSize/1MB)} else {$InputFileSizeStr = "{0:n} GB" -f ($InputFileSize/1GB)}
 
 	# Work through each line of the folder file removing non ISO-8859-1 characters
 	$InputFileWithPath = (Get-ChildItem $InputFile).FullName
 	ForEach ($Password in [System.IO.File]::ReadLines($InputFileWithPath))
 	{
+		# Update the progress variables
+		$PasswordsProgressed++
+
 		# Remove non ISO-8859-1 characters
-		# $Password = $Password  -replace '\P{IsBasicLatin}'	# [^\p{IsBasicLatin}\p{IsLatin-1Supplement}]')
-		# $Password = $Password  -replace '[^\p{IsBasicLatin}\p{IsLatin-1Supplement}]'
 		$Password = $Password -replace '[^^\x30-\x39\x41-\x5A\x61-\x7A]+'
 
 		# Reset temporary variables
@@ -252,19 +264,17 @@ function Convert-Passwords {
 			$BytesProcessed += $Password.Length
 
 			$PercentageCompleted = ($BytesProcessed/$InputFileSize * 100)
-			$StatusText = "Processed {0:n}% / {1:n} MB of {2:n} MB -- Password: {3}" -f $PercentageCompleted, ($BytesProcessed/1MB), ($InputFileSize/1MB), $($Password)
+			if ($BytesProcessed -lt 1GB) {$BytesProcessedStr = "{0:n} MB" -f ($BytesProcessed/1MB)} else {$BytesProcessedStr = "{0:n} GB" -f ($BytesProcessed/1GB)}
+			$StatusText = "Processed {0:n}% ({1} of {2}) -- Added {3:n0} of {4:n0} -- {5}" -f $PercentageCompleted, $BytesProcessedStr, $InputFileSizeStr, $PasswordsAdded, $PasswordsProgressed, $($Password)
 			Write-Progress -PercentComplete $PercentageCompleted -Activity "Processing passwords from $($InputFile)" -Status $StatusText
 		}
-
-		# Update the progress variables
-		$PasswordsProgressed++
 
 		# Change the password to stop special characters being processing by SQL
 		$SafePassword = $Password.Replace('\','\\').Replace("'","''").Replace(';','\;').Replace('--','\--').Replace('/*','\/*').Replace('*/','\*/').Replace('0x','\0x').Replace('+','\+')
 		
 		## .Replace('if','\if').Replace('else','\else').Replace('IF','\IF').Replace('ELSE','\ELSE').Replace('FROM','\FROM').Replace('from','\from').Replace('select','\select').Replace('SELECT','\SELECT')
 
-		if ($TRUE -eq $LogFile) {"  Password changed from: $($Password)`n                     to: $($SafePassword)" >> $PasswordLog}
+		if ($LogFile) {"  Password changed from: $($Password)`n                     to: $($SafePassword)" >> $PasswordLog}
 
 		# Is the password already in the Database?
 		if (!$OutputCSV) {
@@ -272,7 +282,7 @@ function Convert-Passwords {
 
 			if ($SelectedRecord) {
 				# Record found
-				if ($TRUE -eq $LogFile) {"  Exists: $($Password) / $($SafePassword)" >> $PasswordLog}
+				if ($LogFile) {"  Exists: $($Password) / $($SafePassword)" >> $PasswordLog}
 				$SkipEntry = $TRUE
 			}
 
@@ -280,7 +290,7 @@ function Convert-Passwords {
 			Remove-Variable -Name SelectedRecord
 		}
 
-		if ($FALSE -eq $SkipEntry) {
+		if (!$SkipEntry) {
 			# Encrypt the clear text password for the Hash functions
 			try {
 				$SecurePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
@@ -311,13 +321,16 @@ function Convert-Passwords {
 				}
 
 				# If both hash function produced an error then doesn't produce an output
-				if (!$NTHashError -or !$LMHashError)	{
+				if (!$NTHashError -or !$LMHashError) {
 					if (!$OutputCSV) {
 						# DB output
-						$Query = "INSERT INTO HashedPasswords (Password, LMHash, NTHash) VALUES ('{0}', '{1}', '{2}')" -f $SafePassword.Replace('"','\"'),$LMHashCode,$NTHashCode
+						$Query = "INSERT INTO HashedPasswords (Password, PasswordLength, LMHash, NTHash) VALUES ('{0}', '{1}', '{2}', '{3}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length,$LMHashCode,$NTHashCode
 
 						try {
 							Invoke-SqliteQuery -DataSource $SQLiteDB -Query "$($Query)" -ErrorAction SilentlyContinue
+
+							# Update the progress variable
+							$PasswordsAdded++
 						}
 						catch {
 							throw "ERROR: Unable to add record for '$($Password)' / '$($SafePassword.Replace('"','\"'))'"
@@ -325,6 +338,9 @@ function Convert-Passwords {
 					} else {
 						# CSV output
 						"`"$($Password)`",`"$($LMHashCode)`",`"$($NTHashCode)`"" >> $SQLiteDatabase
+
+						# Update the progress variable
+						$PasswordsAdded++
 					}
 				}
 			}
@@ -348,6 +364,9 @@ function Convert-Passwords {
 	$HowLong = $Finished - $Started
 	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
+
+	"\nProcessed: {0}" -f $InputFileSizeStr
+	"    Added: {0:n0} of {1:n0}" -f $PasswordsAdded, $PasswordsProgressed
 }
 
 function Find-Passwords {
@@ -405,7 +424,7 @@ function Find-Passwords {
 	Param (
 		[string]$InputFile = $(throw "-InputFile is required."),
 		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
-		[switch]$ShowProgressBar = $FALSE
+		[switch]$ShowProgressBar = $false
 	)
 
 	# When did the task start?
@@ -519,7 +538,7 @@ function Import-Passwords {
 		Progress information is output to the screen (which can be re-directed)
 
     .EXAMPLE
-        Import-Passwords -InputFile "passwords.txt" -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar:$true
+        Import-Passwords -InputFile "passwords.txt" -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar
 
     .LINK
         Links to further documentation isn't enabled.
@@ -532,13 +551,13 @@ function Import-Passwords {
 	Param (
 		[string]$InputFile = $(throw "-InputFile is required."),
 		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
-		[switch]$ShowProgressBar = $FALSE
+		[switch]$ShowProgressBar = $false
 	)
 
 	Convert-Passwords -InputFile $InputFile -SQLiteDatabase $SQLiteDatabase -LMHash:$false -NTHash:$false -ShowProgressBar:$ShowProgressBar -LogFile:$false
 }
 
-function Create-Hashes {
+function Add-MissingHashes {
 <#
     .SYNOPSIS
         This function will create missing hashes in the SQL database
@@ -569,7 +588,7 @@ function Create-Hashes {
 		Progress information is output to the screen (which can be re-directed)
 
     .EXAMPLE
-        Create-Hashes -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar:$true
+        Create-MissingHashes -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar
 
     .LINK
         Links to further documentation isn't enabled.
@@ -581,16 +600,150 @@ function Create-Hashes {
 
 	Param (
 		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
-		[switch]$ShowProgressBar = $FALSE
+		[switch]$ShowProgressBar = $false
 	)
 
+	# Remove '.\' from the beginning of the line
+	if ($SQLiteDatabase.StartsWith('.\')) {$SQLiteDatabase = $SQLiteDatabase.Substring(2)}
+
+	# Define The SQLiteDB filename variable
+	if ($SQLiteDatabase.Substring(1).StartsWith(":\")) {
+		# Starts with a drive letter & folder
+		$SQLiteDB = "$($SQLiteDatabase)"
+	} else {
+		# Must start with .\
+		$SQLiteDB = ".\$($SQLiteDatabase)"
+	}
+
+	# Make sure the Database exists
+	if (!(Test-Path $SQLiteDatabase)) {
+		"ERROR: Missing Database $($SQLiteDatabase)"
+		Break
+	}
+
+	# When did the task start?
+	$Started = Get-Date
+	"Started: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Started.Year, $Started.Month, $Started.Day, $Started.Hour, $Started.Minute, $Started.Second
+	
+	# Used by the Status Bar
+	$PasswordsProgressed = 0
+	$HashesAdded = 0
+
 	# Work through the database for blank hashes
+	$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE NTHash='' OR (LMHash='' AND PasswordLength < 15) LIMIT 1" -ErrorAction SilentlyContinue
+
+	# Is there anything to do?
+	while ($SelectedRecord) {
+		# Update the progress variables
+		$PasswordsProgressed++	
+
+		# Show the progress bar if required
+		if ($ShowProgressBar) {
+			$StatusText = "Progressed: {0:n0} -- {1}" -f $PasswordsProgressed, $($SelectedRecord.Password)
+			Write-Progress -Activity "Creating Password hashes" -Status $StatusText
+		}
+
+		# Does the NTHash need to be calculated
+		if (!$SelectedRecord.NTHash) {
+			$SecurePassword = ConvertTo-SecureString -String $SelectedRecord.Password -AsPlainText -Force
+
+			try   {$NTHashCode = ConvertTo-NTHash -Password $SecurePassword -ErrorAction SilentlyContinue}
+			catch {$NTHashCode = ''}
+		}
+
+		# Does the LMHash need to be calculated
+		if (!$SelectedRecord.LMHash) {
+			$SecurePassword = ConvertTo-SecureString -String $SelectedRecord.Password -AsPlainText -Force
+
+			try   {$LMHashCode = ConvertTo-LMHash -Password $SecurePassword -ErrorAction SilentlyContinue}
+			catch {$LMHashCode = ''}
+		}
+
+		# Update the Record
+		$Query = "UPDATE HashedPasswords SET NTHash='$($NTHashCode)',LMHash='$($LMHashCode)',PasswordLength=$($SelectedRecord.Password.Length) WHERE ID=$($SelectedRecord.ID)"
+		try {
+			Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query -ErrorAction SilentlyContinue
+
+			# Update the progress variable
+			$HashesAdded++
+		}
+		catch {}
+
+		# Read the next record to process
+		try {
+			$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE NTHash='' OR (LMHash='' AND PasswordLength < 15) LIMIT 1" -ErrorAction SilentlyContinue
+		}
+		catch {}
+	}
+
+	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+	"Hashes added: {0:n0}" -f $HashesAdded
+
+	# When did the task finish?
+	$Finished = Get-Date
+
+	# How long did the work take?
+	$HowLong = $Finished - $Started
+	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
+	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
 }
 
 function Find-ExcelPassword {
+<#
+    .SYNOPSIS
+        This function attempts to open an Excel file using the passwords from the Database
+
+    .DESCRIPTION
+        This function attempts to open an Excel file using the passwords from the Database
+		
+		It is possible to select the minimum password length to start on.  This parameter
+		was added so time would not be wasted checking passwords that are too short.
+		
+		This script depends on:
+		  DSInternals from https://github.com/MichaelGrafnetter/DSInternals
+	      PSSQLite    from https://github.com/RamblingCookieMonster/PSSQLite
+
+    .PARAMETER PasswordFile
+        This file containing the list of passowrds.  Each line is considered a password
+
+    .PARAMETER SQLiteDatabase
+        This is the SQLite Database to be used
+
+    .PARAMETER MinimumPasswordLength
+        This is minimum password length that will be used.
+
+		The default is 1 character as the minimum length
+
+    .PARAMETER ShowProgressBar
+		This switch is either $TRUE or $FALSE.
+
+		$TRUE  will show a progress bar
+		$FALSE will not show a progress bar
+
+		Default value:	$FALSE
+
+    .INPUTS
+        Piped values are not supported.
+
+    .OUTPUTS
+		The function uses a progress bar by default
+		Progress information is output to the screen (which can be re-directed)
+
+    .EXAMPLE
+        Import-Passwords -InputFile "passwords.txt" -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar
+
+    .LINK
+        Links to further documentation isn't enabled.
+
+    .NOTES
+		Error trapping from the 3rd party module isn't possible
+
+#>
+
 	Param (
 		[string]$ExcelFile = $(throw "-ExcelFile is required."),
 		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
+		[int]$MinimumPasswordLength = 1,
 		[switch]$ShowProgressBar = $FALSE
 	)
 
@@ -624,7 +777,7 @@ function Find-ExcelPassword {
 	$PasswordCount = (Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT seq FROM sqlite_sequence").seq
 
 	# Get the  first password
-	$Password = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT ID,Password FROM HashedPasswords WHERE ID=1"
+	$Password = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT ID,Password FROM HashedPasswords WHERE ID=1 AND PasswordLength >= $MinimumPasswordLength"
 
 	$ExitLoopReason = 0
 	$PasswordFound = 1
@@ -665,7 +818,7 @@ function Find-ExcelPassword {
 					# Couldn't open the file so try the next password
 					try {
 						# Read the next record if possible
-						$Password = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT ID,Password FROM HashedPasswords WHERE ID = $($Password.ID + 1)"
+						$Password = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT ID,Password FROM HashedPasswords WHERE ID = $($Password.ID + 1) AND PasswordLength >= $MinimumPasswordLength"
 					}
 					catch {
 						"`nPassword NOT Found: {0:n0} attempts" -f $Password.ID
