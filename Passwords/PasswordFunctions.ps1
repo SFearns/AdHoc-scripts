@@ -6,7 +6,74 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-Write-Host "`nPassword Functions  v2024-08-11"
+Write-Host "`nPassword Functions  v2024-08-13"
+# Write-Host ""
+# Write-Host "List all available commands with: " -NoNewline
+# Write-Host "Get-PasswordCommands" -ForegroundColor Yellow
+
+<#
+function Get-PasswordCommands {
+    [CmdletBinding()]
+    Param ()
+    Write-Verbose 'This command executed the following:'
+    Write-Verbose 'Get-Command *-Isilon* -CommandType Function | Sort-Object Name'
+    Get-Command *-Isilon* -CommandType Function | Sort-Object Name
+}
+#>
+
+function Create-SQLiteDatabase {
+	Param (
+		[string]$SQLiteDatabase = "HashedPasswords.SQLite"
+	)
+
+	# Create the tables with the required fields
+	$Query = 'CREATE TABLE "HashedPasswords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "PasswordLength" INTEGER, "LMHash" TEXT KEY, "NTHash" TEXT KEY, PRIMARY KEY("ID" AUTOINCREMENT));'
+	try {
+		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+		"Created: $($SQLiteDB) - Table"
+	}
+	catch {throw "ERROR: Unable to create $($SQLiteDB)"}	
+
+	# Create the index for the ID field
+	$Query = 'CREATE UNIQUE INDEX "ID" ON "HashedPasswords" ("ID" ASC);'
+	try {
+		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+		"Created: $($SQLiteDB) - Index for ID"
+	}
+	catch {throw "ERROR: Unable to UNIQUE Index for ID -- $($SQLiteDB)"}	
+
+	# Create a UNIQUE Index for the clear-text password
+	$Query = 'CREATE UNIQUE INDEX "Password" ON HashedPasswords ("Password" ASC)'
+	try {
+		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+		"Created: $($SQLiteDB) - Index for Password"
+	}
+	catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
+
+	# Create a UNIQUE Index for the clear-text password
+	$Query = 'CREATE INDEX "PasswordLength" ON HashedPasswords ("PasswordLength" ASC)'
+	try {
+		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+		"Created: $($SQLiteDB) - Index for PasswordLength"
+	}
+	catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
+
+	# Create a UNIQUE Index for the clear-text password
+	$Query = 'CREATE INDEX "NTHash" ON HashedPasswords ("NTHash" ASC)'
+	try {
+		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+		"Created: $($SQLiteDB) - Index for NTHash"
+	}
+	catch {throw "ERROR: Unable to Index for NTHash -- $($SQLiteDB)"}	
+	
+	# Create a UNIQUE Index for the clear-text password
+	$Query = 'CREATE INDEX "LMHash" ON HashedPasswords ("LMHash" ASC)'
+	try {
+		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
+		"Created: $($SQLiteDB) - Index for LMHash"
+	}
+	catch {throw "ERROR: Unable to Index for LMHash -- $($SQLiteDB)"}	
+}
 
 function Convert-Passwords {
 <#
@@ -139,7 +206,8 @@ function Convert-Passwords {
 
 	# How large is the InputFile
 	$InputFileSize = (Get-ChildItem $InputFile).Length
-	"Filesize for '$($InputFile)': {0:n} MB`n" -f ($InputFileSize/1MB)
+	if ($InputFileSize -lt 1GB) {$InputFileSizeStr = "{0:n} MB" -f ($InputFileSize/1MB)} else {$InputFileSizeStr = "{0:n} GB" -f ($InputFileSize/1GB)}
+	"Filesize for '$($InputFile)': {0:n}`n" -f $InputFileSizeStr
 
 	# Remove '.\' from the beginning of the line
 	if ($SQLiteDatabase.StartsWith('.\')) {$SQLiteDatabase = $SQLiteDatabase.Substring(2)}
@@ -164,53 +232,7 @@ function Convert-Passwords {
                 Remove-Item -Path $SQLiteDatabase -Force | Out-Null
             }
 
-			# Create the tables with the required fields
-			$Query = 'CREATE TABLE "HashedPasswords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "PasswordLength" INTEGER, "LMHash" TEXT KEY, "NTHash" TEXT KEY, PRIMARY KEY("ID" AUTOINCREMENT));'
-			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB) - Table"
-			}
-			catch {throw "ERROR: Unable to create $($SQLiteDB)"}	
-
-			# Create the index for the ID field
-			$Query = 'CREATE UNIQUE INDEX "ID" ON "HashedPasswords" ("ID" ASC);'
-			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB) - Index for ID"
-			}
-			catch {throw "ERROR: Unable to UNIQUE Index for ID -- $($SQLiteDB)"}	
-
-			# Create a UNIQUE Index for the clear-text password
-			$Query = 'CREATE UNIQUE INDEX "Password" ON HashedPasswords ("Password" ASC)'
-			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB) - Index for Password"
-			}
-			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
-
-			# Create a UNIQUE Index for the clear-text password
-			$Query = 'CREATE INDEX "PasswordLength" ON HashedPasswords ("PasswordLength" ASC)'
-			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB) - Index for PasswordLength"
-			}
-			catch {throw "ERROR: Unable to UNIQUE Index for Password -- $($SQLiteDB)"}	
-
-			# Create a UNIQUE Index for the clear-text password
-			$Query = 'CREATE INDEX "NTHash" ON HashedPasswords ("NTHash" ASC)'
-			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB) - Index for NTHash"
-			}
-			catch {throw "ERROR: Unable to Index for NTHash -- $($SQLiteDB)"}	
-			
-			# Create a UNIQUE Index for the clear-text password
-			$Query = 'CREATE INDEX "LMHash" ON HashedPasswords ("LMHash" ASC)'
-			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
-                "Created: $($SQLiteDB) - Index for LMHash"
-			}
-			catch {throw "ERROR: Unable to Index for LMHash -- $($SQLiteDB)"}	
+			Create-SQLiteDatabase -SQLiteDatabase $SQLiteDB
 		} else {
 			"Using existing SQLite Database: $($SQLiteDatabase)"
 		}
@@ -250,6 +272,8 @@ function Convert-Passwords {
 		$PasswordsProgressed++
 
 		# Remove non ISO-8859-1 characters
+		# $Password = $Password  -replace '\P{IsBasicLatin}'	# [^\p{IsBasicLatin}\p{IsLatin-1Supplement}]')
+		# $Password = $Password  -replace '[^\p{IsBasicLatin}\p{IsLatin-1Supplement}]'
 		$Password = $Password -replace '[^^\x30-\x39\x41-\x5A\x61-\x7A]+'
 
 		# Reset temporary variables
@@ -510,13 +534,13 @@ function Import-Passwords {
     .DESCRIPTION
 		This function imports new passwords from a text file (1 password per line) and rejects duplicates.
 		
-		The NTHash and LMHash are NOT created as part of this process.  See 'Create-MissingHashes' for that function.
+		The NTHash and LMHash are NOT created as part of this process.  See 'Add-MissingHashes' for that function.
 
 		This script depends on:
 		  DSInternals from https://github.com/MichaelGrafnetter/DSInternals
 	      PSSQLite    from https://github.com/RamblingCookieMonster/PSSQLite
 
-    .PARAMETER PasswordFile
+    .PARAMETER InputFile
         This file containing the list of passowrds.  Each line is considered a password
 
     .PARAMETER SQLiteDatabase
@@ -670,9 +694,7 @@ function Add-MissingHashes {
 		catch {}
 
 		# Read the next record to process
-		try {
-			$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE NTHash='' OR (LMHash='' AND PasswordLength < 15) LIMIT 1" -ErrorAction SilentlyContinue
-		}
+		try {$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE NTHash='' OR (LMHash='' AND PasswordLength < 15) LIMIT 1" -ErrorAction SilentlyContinue}
 		catch {}
 	}
 
@@ -860,4 +882,157 @@ function Find-ExcelPassword {
 	$HowLong = $Finished - $Started
 	"`nFinished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
+}
+
+function Import-COMBPasswords {
+<#
+	.SYNOPSIS
+		This function imports new passwords from a text file (: seperated fields) and rejects duplicates
+
+	.DESCRIPTION
+		This function imports new passwords from a text file (: seperated fields) and rejects duplicates.
+		
+		The NTHash and LMHash are NOT created as part of this process.  See 'Add-MissingHashes' for that function.
+
+		This script depends on:
+			DSInternals from https://github.com/MichaelGrafnetter/DSInternals
+			PSSQLite    from https://github.com/RamblingCookieMonster/PSSQLite
+
+	.PARAMETER InputFile
+		This file containing the list of passowrds.
+
+	.PARAMETER SQLiteDatabase
+		This is the SQLite Database to be used
+
+	.PARAMETER ShowProgressBar
+		This switch is either $TRUE or $FALSE.
+
+		$TRUE  will show a progress bar
+		$FALSE will not show a progress bar
+
+		Default value:	$FALSE
+
+	.INPUTS
+		Piped values are not supported.
+
+	.OUTPUTS
+		The function uses a progress bar by default
+		Progress information is output to the screen (which can be re-directed)
+
+	.EXAMPLE
+		Import-Passwords -InputFile "passwords.txt" -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar
+
+	.LINK
+		Links to further documentation isn't enabled.
+
+	.NOTES
+		Error trapping from the 3rd party module isn't possible
+
+#>
+
+	Param (
+		[string]$InputFile = $(throw "-InputFile is required."),
+		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
+		[switch]$ShowProgressBar = $false
+	)
+
+	# When did the task start?
+	$Started = Get-Date
+	"Started: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Started.Year, $Started.Month, $Started.Day, $Started.Hour, $Started.Minute, $Started.Second
+
+	# How large is the InputFile
+	$InputFileSize = (Get-ChildItem $InputFile).Length
+	if ($InputFileSize -lt 1GB) {$InputFileSizeStr = "{0:n} MB" -f ($InputFileSize/1MB)} else {$InputFileSizeStr = "{0:n} GB" -f ($InputFileSize/1GB)}
+	"Filesize for '$($InputFile)': {0:n}`n" -f $InputFileSizeStr
+
+	# Remove '.\' from the beginning of the line
+	if ($SQLiteDatabase.StartsWith('.\')) {$SQLiteDatabase = $SQLiteDatabase.Substring(2)}
+
+	# Define The SQLiteDB filename variable
+	if ($SQLiteDatabase.Substring(1).StartsWith(":\")) {
+		# Starts with a drive letter & folder
+		$SQLiteDB = "$($SQLiteDatabase)"
+	} else {
+		# Must start with .\
+		$SQLiteDB = ".\$($SQLiteDatabase)"
+	}
+
+	# Make sure the Database exists
+	if (!(Test-Path $SQLiteDatabase)) {
+		"ERROR: Missing Database $($SQLiteDatabase)"
+	}
+
+	# Used by the Status Bar
+	$PasswordsProgressed = 0
+	$PasswordsAdded = 0
+	$BytesProcessed = 0
+
+	# Work through each line of the folder file removing non ISO-8859-1 characters
+	$InputFileWithPath = (Get-ChildItem $InputFile).FullName
+	ForEach ($Line in [System.IO.File]::ReadLines($InputFileWithPath))
+	{
+		# Update the progress variables
+		$PasswordsProgressed++
+
+		# Split the line and grab the password from the last block
+		[array]$SplitValues = $Line.Split(':')
+		$Password = $SplitValues[$SplitValues.Count - 1]
+
+		# Remove non ISO-8859-1 characters
+		$Password = $Password -replace '[^^\x30-\x39\x41-\x5A\x61-\x7A]+'
+
+		# Reset temporary variables
+		$SkipEntry = $FALSE
+
+		# Show the progress bar if required
+		if ($ShowProgressBar) {
+			$BytesProcessed += $Password.Length
+
+			$PercentageCompleted = ($BytesProcessed/$InputFileSize * 100)
+			if ($BytesProcessed -lt 1GB) {$BytesProcessedStr = "{0:n} MB" -f ($BytesProcessed/1MB)} else {$BytesProcessedStr = "{0:n} GB" -f ($BytesProcessed/1GB)}
+			$StatusText = "Processed {0:n}% ({1} of {2}) -- Added {3:n0} of {4:n0} -- {5}" -f $PercentageCompleted, $BytesProcessedStr, $InputFileSizeStr, $PasswordsAdded, $PasswordsProgressed, $($Password)
+			Write-Progress -PercentComplete $PercentageCompleted -Activity "Processing passwords from $($InputFile)" -Status $StatusText
+		}
+
+		# Change the password to stop special characters being processing by SQL
+		$SafePassword = $Password.Replace('\','\\').Replace("'","''").Replace(';','\;').Replace('--','\--').Replace('/*','\/*').Replace('*/','\*/').Replace('0x','\0x').Replace('+','\+')
+		
+		# Is the password already in the Database?
+		$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE Password='$($SafePassword.Replace('"','\"'))'" -ErrorAction SilentlyContinue
+
+		if ($SelectedRecord) {
+			# Record found
+			$SkipEntry = $TRUE
+		}
+
+		# Remove the temporary variable
+		Remove-Variable -Name SelectedRecord
+
+		if (!$SkipEntry) {
+			$Query = "INSERT INTO HashedPasswords (Password, PasswordLength, LMHash, NTHash) VALUES ('{0}', '{1}', '{2}', '{3}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length,$LMHashCode,$NTHashCode
+
+			try {
+				Invoke-SqliteQuery -DataSource $SQLiteDB -Query "$($Query)" -ErrorAction SilentlyContinue
+
+				# Update the progress variable
+				$PasswordsAdded++
+			}
+			catch {
+				throw "ERROR: Unable to add record for '$($Password)' / '$($SafePassword.Replace('"','\"'))'"
+			}			
+		}
+	}
+
+	"`nPasswords processed: {0}`n" -f $PasswordsProgressed
+
+	# When did the task finish?
+	$Finished = Get-Date
+
+	# How long did the work take?
+	$HowLong = $Finished - $Started
+	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
+	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
+
+	"\nProcessed: {0}" -f $InputFileSizeStr
+	"    Added: {0:n0} of {1:n0}" -f $PasswordsAdded, $PasswordsProgressed
 }
