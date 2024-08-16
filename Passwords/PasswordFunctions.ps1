@@ -6,7 +6,7 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-Write-Host "`nPassword Functions  v2024-08-13"
+Write-Host "`nPassword Functions  v2024-08-16"
 # Write-Host ""
 # Write-Host "List all available commands with: " -NoNewline
 # Write-Host "Get-PasswordCommands" -ForegroundColor Yellow
@@ -442,7 +442,6 @@ function Find-Passwords {
 
     .NOTES
 		Error trapping from the 3rd party module isn't possible
-
 #>
 
 	Param (
@@ -569,7 +568,6 @@ function Import-Passwords {
 
     .NOTES
 		Error trapping from the 3rd party module isn't possible
-
 #>
 
 	Param (
@@ -587,7 +585,7 @@ function Add-MissingHashes {
         This function will create missing hashes in the SQL database
 
     .DESCRIPTION
-		This function will create any missing hashes in the SQL database.  If creating a hash fails then a dummy value 'failed_to_create' will be entered.
+		This function will create any missing hashes in the SQL database.
 		
 		This script depends on:
 		  DSInternals from https://github.com/MichaelGrafnetter/DSInternals
@@ -619,7 +617,6 @@ function Add-MissingHashes {
 
     .NOTES
 		Error trapping from the 3rd party module isn't possible
-
 #>
 
 	Param (
@@ -651,7 +648,7 @@ function Add-MissingHashes {
 	
 	# Used by the Status Bar
 	$PasswordsProgressed = 0
-	$HashesAdded = 0
+	$RecordsUpdated = 0
 
 	# Work through the database for blank hashes
 	$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE NTHash='' OR (LMHash='' AND PasswordLength < 15) LIMIT 1" -ErrorAction SilentlyContinue
@@ -663,7 +660,7 @@ function Add-MissingHashes {
 
 		# Show the progress bar if required
 		if ($ShowProgressBar) {
-			$StatusText = "Progressed: {0:n0} -- {1}" -f $PasswordsProgressed, $($SelectedRecord.Password)
+			$StatusText = "Processed: {0:n0} -- {1}" -f $PasswordsProgressed, $($SelectedRecord.Password)
 			Write-Progress -Activity "Creating Password hashes" -Status $StatusText
 		}
 
@@ -689,7 +686,7 @@ function Add-MissingHashes {
 			Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query -ErrorAction SilentlyContinue
 
 			# Update the progress variable
-			$HashesAdded++
+			$RecordsUpdated++
 		}
 		catch {}
 
@@ -699,7 +696,7 @@ function Add-MissingHashes {
 	}
 
 	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
-	"Hashes added: {0:n0}" -f $HashesAdded
+	"Records updated:     {0:n0}" -f $RecordsUpdated
 
 	# When did the task finish?
 	$Finished = Get-Date
@@ -710,6 +707,119 @@ function Add-MissingHashes {
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
 }
 
+function Add-MissingPasswordLength {
+<#
+	.SYNOPSIS
+		This function will insert the missing PasswordLength in the SQL database
+
+	.DESCRIPTION
+		This function will insert the missing PasswordLength in the SQL database.
+		
+		This script depends on:
+			DSInternals from https://github.com/MichaelGrafnetter/DSInternals
+			PSSQLite    from https://github.com/RamblingCookieMonster/PSSQLite
+
+	.PARAMETER SQLiteDatabase
+		This is the SQLite Database to be used
+
+	.PARAMETER ShowProgressBar
+		This switch is either $TRUE or $FALSE.
+
+		$TRUE  will show a progress bar
+		$FALSE will not show a progress bar
+
+		Default value:	$FALSE
+
+	.INPUTS
+		Piped values are not supported.
+
+	.OUTPUTS
+		The function uses a progress bar by default
+		Progress information is output to the screen (which can be re-directed)
+
+	.EXAMPLE
+		Add-MissingPasswordLength -SQLiteDatabase "HashedPasswords.SQLite" -ShowProgressBar
+
+	.LINK
+		Links to further documentation isn't enabled.
+
+	.NOTES
+		Error trapping from the 3rd party module isn't possible
+#>
+
+	Param (
+		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
+		[switch]$ShowProgressBar = $false
+	)
+
+	# Remove '.\' from the beginning of the line
+	if ($SQLiteDatabase.StartsWith('.\')) {$SQLiteDatabase = $SQLiteDatabase.Substring(2)}
+
+	# Define The SQLiteDB filename variable
+	if ($SQLiteDatabase.Substring(1).StartsWith(":\")) {
+		# Starts with a drive letter & folder
+		$SQLiteDB = "$($SQLiteDatabase)"
+	} else {
+		# Must start with .\
+		$SQLiteDB = ".\$($SQLiteDatabase)"
+	}
+
+	# Make sure the Database exists
+	if (!(Test-Path $SQLiteDatabase)) {
+		"ERROR: Missing Database $($SQLiteDatabase)"
+		Break
+	}
+
+	# When did the task start?
+	$Started = Get-Date
+	"Started: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Started.Year, $Started.Month, $Started.Day, $Started.Hour, $Started.Minute, $Started.Second
+	
+	# Used by the Status Bar
+	$PasswordsProgressed = 0
+	$RecordsUpdated = 0
+
+	# Work through the database for blank hashes
+	$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE PasswordLength IS NULL LIMIT 1" -ErrorAction SilentlyContinue
+
+	# Is there anything to do?
+	while ($SelectedRecord) {
+		# Update the progress variables
+		$PasswordsProgressed++	
+
+		# Show the progress bar if required
+		if ($ShowProgressBar) {
+			$StatusText = "Processed: {0:n0} -- {1}" -f $PasswordsProgressed, $($SelectedRecord.Password)
+			Write-Progress -Activity "Setting Password length" -Status $StatusText
+		}
+
+		# Update the Record
+		$Query = "UPDATE HashedPasswords SET PasswordLength=$($SelectedRecord.Password.Length) WHERE ID=$($SelectedRecord.ID)"
+		try {
+			Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query -ErrorAction SilentlyContinue
+
+			# Update the progress variable
+			$RecordsUpdated++
+		}
+		catch {}
+
+		# Read the next record to process
+		try {$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query "SELECT * FROM HashedPasswords WHERE PasswordLength IS NULL LIMIT 1" -ErrorAction SilentlyContinue}
+		catch {}
+	}
+
+	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+	"Records updated:     {0:n0}" -f $RecordsUpdated
+
+	# When did the task finish?
+	$Finished = Get-Date
+
+	# How long did the work take?
+	$HowLong = $Finished - $Started
+	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
+	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
+}
+	
+	
 function Find-ExcelPassword {
 <#
     .SYNOPSIS
@@ -759,7 +869,6 @@ function Find-ExcelPassword {
 
     .NOTES
 		Error trapping from the 3rd party module isn't possible
-
 #>
 
 	Param (
@@ -927,7 +1036,6 @@ function Import-COMBPasswords {
 
 	.NOTES
 		Error trapping from the 3rd party module isn't possible
-
 #>
 
 	Param (
