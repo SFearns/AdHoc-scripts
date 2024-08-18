@@ -389,7 +389,7 @@ function Convert-Passwords {
 	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
 
-	"\nProcessed: {0}" -f $InputFileSizeStr
+	"`nProcessed: {0}" -f $InputFileSizeStr
 	"    Added: {0:n0} of {1:n0}" -f $PasswordsAdded, $PasswordsProgressed
 }
 
@@ -1141,6 +1141,6 @@ function Import-COMBPasswords {
 	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
 
-	"\nProcessed: {0}" -f $InputFileSizeStr
+	"`nProcessed: {0}" -f $InputFileSizeStr
 	"    Added: {0:n0} of {1:n0}" -f $PasswordsAdded, $PasswordsProgressed
 }
