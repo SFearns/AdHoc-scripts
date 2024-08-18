@@ -6,7 +6,7 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-Write-Host "`nPassword Functions  v2024-08-16"
+Write-Host "`nPassword Functions  v2024-08-18"
 # Write-Host ""
 # Write-Host "List all available commands with: " -NoNewline
 # Write-Host "Get-PasswordCommands" -ForegroundColor Yellow
@@ -379,7 +379,9 @@ function Convert-Passwords {
 		$VerbosePreference = $OldVerbose
 	}
 
-	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+#	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+	"`nProcessed: {0}" -f $InputFileSizeStr
+	"    Added: {0:n0} of {1:n0}`n" -f $PasswordsAdded, $PasswordsProgressed
 
 	# When did the task finish?
 	$Finished = Get-Date
@@ -388,9 +390,6 @@ function Convert-Passwords {
 	$HowLong = $Finished - $Started
 	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
-
-	"`nProcessed: {0}" -f $InputFileSizeStr
-	"    Added: {0:n0} of {1:n0}" -f $PasswordsAdded, $PasswordsProgressed
 }
 
 function Find-Passwords {
@@ -807,7 +806,7 @@ function Add-MissingPasswordLength {
 		catch {}
 	}
 
-	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+	"`nPasswords processed: {0:n0}" -f $PasswordsProgressed
 	"Records updated:     {0:n0}" -f $RecordsUpdated
 
 	# When did the task finish?
@@ -815,7 +814,7 @@ function Add-MissingPasswordLength {
 
 	# How long did the work take?
 	$HowLong = $Finished - $Started
-	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
+	"`nFinished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
 }
 	
@@ -1131,7 +1130,10 @@ function Import-COMBPasswords {
 		}
 	}
 
-	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+	# "`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
+
+	"`nProcessed: {0}" -f $InputFileSizeStr
+	"    Added: {0:n0} of {1:n0}`n" -f $PasswordsAdded, $PasswordsProgressed
 
 	# When did the task finish?
 	$Finished = Get-Date
@@ -1140,7 +1142,4 @@ function Import-COMBPasswords {
 	$HowLong = $Finished - $Started
 	"Finished: {0:d4}/{1:d2}/{2:d2} @ {3:d2}:{4:d2}:{5:d2}" -f $Finished.Year, $Finished.Month, $Finished.Day, $Finished.Hour, $Finished.Minute, $Finished.Second
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
-
-	"`nProcessed: {0}" -f $InputFileSizeStr
-	"    Added: {0:n0} of {1:n0}" -f $PasswordsAdded, $PasswordsProgressed
 }
