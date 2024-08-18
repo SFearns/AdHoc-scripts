@@ -379,7 +379,7 @@ function Convert-Passwords {
 		$VerbosePreference = $OldVerbose
 	}
 
-	"`nPasswords processed: {0}`n" -f $PasswordsProgressed
+	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
 
 	# When did the task finish?
 	$Finished = Get-Date
@@ -514,7 +514,7 @@ function Find-Passwords {
 		"$($LineParts[0]),$($LineParts[1]),$($FoundLMHash),$($FoundNTHash),$($LineParts[4]),$($LineParts[5])"
 	}
 
-	"`nPasswords processed: {0}`n" -f $PasswordsProgressed
+	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
 
 	# When did the task finish?
 	$Finished = Get-Date
@@ -1117,7 +1117,7 @@ function Import-COMBPasswords {
 		Remove-Variable -Name SelectedRecord
 
 		if (!$SkipEntry) {
-			$Query = "INSERT INTO HashedPasswords (Password, PasswordLength, LMHash, NTHash) VALUES ('{0}', '{1}', '{2}', '{3}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length,$LMHashCode,$NTHashCode
+			$Query = "INSERT INTO HashedPasswords (Password, PasswordLength) VALUES ('{0}', '{1}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length
 
 			try {
 				Invoke-SqliteQuery -DataSource $SQLiteDB -Query "$($Query)" -ErrorAction SilentlyContinue
@@ -1131,7 +1131,7 @@ function Import-COMBPasswords {
 		}
 	}
 
-	"`nPasswords processed: {0}`n" -f $PasswordsProgressed
+	"`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
 
 	# When did the task finish?
 	$Finished = Get-Date
