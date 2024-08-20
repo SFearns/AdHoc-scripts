@@ -6,7 +6,7 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-Write-Host "`nPassword Functions  v2024-08-18"
+Write-Host "`nPassword Functions  v2024-08-20"
 # Write-Host ""
 # Write-Host "List all available commands with: " -NoNewline
 # Write-Host "Get-PasswordCommands" -ForegroundColor Yellow
@@ -321,27 +321,27 @@ function Convert-Passwords {
 
 				# If the password is outside the 0-14 character range it can throw an error so
 				# we shall hide those errors
-				try {
-					if ($NTHash) {
+				if ($NTHash) {
+					try {
 						$NTHashCode = ConvertTo-NTHash -Password $SecurePassword -ErrorAction SilentlyContinue
 					}
+					catch {
+						Write-Verbose "  ERROR: NTHash couldn't be produced for '$($Password)'"
+						$NTHashError = $TRUE
+					}
 				}
-				catch {
-					Write-Verbose "  ERROR: NTHash couldn't be produced for '$($Password)'"
-					$NTHashError = $TRUE
-				}
-				try {
-					if ($LMHash) {
+				if ($LMHash) {
+					try {
 						$LMHashCode = ConvertTo-LMHash -Password $SecurePassword -ErrorAction SilentlyContinue
 					}
-				}
-				catch {
-					if ($Password.Length -gt 14) {
-						Write-Verbose "  ERROR: LMHash couldn't be produced for '$($Password)' as it's >14 characters"
-					} else {
-						Write-Verbose "  ERROR: LMHash couldn't be produced for '$($Password)'"
+					catch {
+						if ($Password.Length -gt 14) {
+							Write-Verbose "  ERROR: LMHash couldn't be produced for '$($Password)' as it's >14 characters"
+						} else {
+							Write-Verbose "  ERROR: LMHash couldn't be produced for '$($Password)'"
+						}
+						$LMHashError = $TRUE
 					}
-					$LMHashError = $TRUE
 				}
 
 				# If both hash function produced an error then doesn't produce an output
@@ -818,7 +818,6 @@ function Add-MissingPasswordLength {
 	"Duration: {0:d2}d {1:d2}h {2:d2}m {3:d2}s`n" -f $HowLong.Days, $HowLong.Hours, $HowLong.Minutes, $HowLong.Seconds
 }
 	
-	
 function Find-ExcelPassword {
 <#
     .SYNOPSIS
@@ -1020,6 +1019,32 @@ function Import-COMBPasswords {
 
 		Default value:	$FALSE
 
+    .PARAMETER NTHASH
+		This switch is either $TRUE or $FALSE.
+
+		$TRUE  will produce an HASH value
+		$FALSE will NOT produce an HASH value
+
+		Default value:	$FALSE
+
+    .PARAMETER LMHASH
+		This switch is either $TRUE or $FALSE.
+
+		$TRUE  will produce an HASH value
+		$FALSE will NOT produce an HASH value
+
+		Default value:	$FALSE
+
+		Notes:
+		The LMHASH function doesn't support Unicode characters and will produce an error
+
+	.PARAMETER Verbose
+		This switch is either $TRUE or $FALSE.
+
+		Will work in the normal way but not fully implemented yet
+
+		Default value:	$FALSE
+
 	.INPUTS
 		Piped values are not supported.
 
@@ -1040,8 +1065,17 @@ function Import-COMBPasswords {
 	Param (
 		[string]$InputFile = $(throw "-InputFile is required."),
 		[string]$SQLiteDatabase = $(throw "-SQLiteDatabase is required."),
+		[switch]$Verbose = $false,
+		[switch]$LMHash = $false,
+		[switch]$NTHash = $false,
 		[switch]$ShowProgressBar = $false
 	)
+
+	# Record old Verbose setting
+	if ($Verbose) {
+		$OldVerbose = $VerbosePreference
+		$VerbosePreference = "Continue"
+	}
 
 	# When did the task start?
 	$Started = Get-Date
@@ -1050,7 +1084,7 @@ function Import-COMBPasswords {
 	# How large is the InputFile
 	$InputFileSize = (Get-ChildItem $InputFile).Length
 	if ($InputFileSize -lt 1GB) {$InputFileSizeStr = "{0:n} MB" -f ($InputFileSize/1MB)} else {$InputFileSizeStr = "{0:n} GB" -f ($InputFileSize/1GB)}
-	"Filesize for '$($InputFile)': {0:n}`n" -f $InputFileSizeStr
+	"Filesize for '$($InputFile)': {0:n}" -f $InputFileSizeStr
 
 	# Remove '.\' from the beginning of the line
 	if ($SQLiteDatabase.StartsWith('.\')) {$SQLiteDatabase = $SQLiteDatabase.Substring(2)}
@@ -1066,7 +1100,7 @@ function Import-COMBPasswords {
 
 	# Make sure the Database exists
 	if (!(Test-Path $SQLiteDatabase)) {
-		"ERROR: Missing Database $($SQLiteDatabase)"
+		"`nERROR: Missing Database $($SQLiteDatabase)"
 	}
 
 	# Used by the Status Bar
@@ -1090,6 +1124,10 @@ function Import-COMBPasswords {
 
 		# Reset temporary variables
 		$SkipEntry = $FALSE
+		$NTHashError = $FALSE
+		$LMHashError = $FALSE
+		$NTHashCode  = ""
+		$LMHashCode  = ""
 
 		# Show the progress bar if required
 		if ($ShowProgressBar) {
@@ -1116,18 +1154,62 @@ function Import-COMBPasswords {
 		Remove-Variable -Name SelectedRecord
 
 		if (!$SkipEntry) {
-			$Query = "INSERT INTO HashedPasswords (Password, PasswordLength) VALUES ('{0}', '{1}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length
-
+			# Encrypt the clear text password for the Hash functions
 			try {
-				Invoke-SqliteQuery -DataSource $SQLiteDB -Query "$($Query)" -ErrorAction SilentlyContinue
+				$SecurePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
 
-				# Update the progress variable
-				$PasswordsAdded++
+				# If the password is outside the 0-14 character range it can throw an error so
+				# we shall hide those errors
+				if ($NTHash) {
+					try {
+						$NTHashCode = ConvertTo-NTHash -Password $SecurePassword -ErrorAction SilentlyContinue
+					}
+					catch {
+						Write-Verbose "  ERROR: NTHash couldn't be produced for '$($Password)'"
+						$NTHashError = $TRUE
+					}
+				}
+				if ($LMHash) {
+					try {
+						$LMHashCode = ConvertTo-LMHash -Password $SecurePassword -ErrorAction SilentlyContinue
+					}
+					catch {
+						if ($Password.Length -gt 14) {
+							Write-Verbose "  ERROR: LMHash couldn't be produced for '$($Password)' as it's >14 characters"
+						} else {
+							Write-Verbose "  ERROR: LMHash couldn't be produced for '$($Password)'"
+						}
+						$LMHashError = $TRUE
+					}
+				}
+
+				# If both hash function produced an error then just record the password
+				if ($NTHashError -and $LMHashError) {
+					$Query = "INSERT INTO HashedPasswords (Password, PasswordLength) VALUES ('{0}', '{1}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length
+				} else {
+					$Query = "INSERT INTO HashedPasswords (Password, PasswordLength, LMHash, NTHash) VALUES ('{0}', '{1}', '{2}', '{3}')" -f $SafePassword.Replace('"','\"'),$SafePassword.Length,$LMHashCode,$NTHashCode
+				}
+
+				# Write the record to the database
+				try {
+					Invoke-SqliteQuery -DataSource $SQLiteDB -Query "$($Query)" -ErrorAction SilentlyContinue
+
+					# Update the progress variable
+					$PasswordsAdded++
+				}
+				catch {
+					throw "`nERROR: Unable to add record for '$($Password)' / '$($SafePassword.Replace('"','\"'))'"
+				}
 			}
 			catch {
-				throw "ERROR: Unable to add record for '$($Password)' / '$($SafePassword.Replace('"','\"'))'"
-			}			
+				Write-Verbose "  ERROR: Invalid password '$($Password)'"
+			}
 		}
+	}
+
+	# Reset the Verbose back to the original
+	if ($Verbose) {
+		$VerbosePreference = $OldVerbose
 	}
 
 	# "`nPasswords processed: {0:n0}`n" -f $PasswordsProgressed
