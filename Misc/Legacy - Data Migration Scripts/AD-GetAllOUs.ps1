@@ -1,0 +1,1 @@
+﻿Get-ADObject -LDAPFilter "(ObjectClass=organizationalUnit)" -Properties * | Export-Clixml -Path "C:\WorkFolder\All_OrganizationalUnits.xml"

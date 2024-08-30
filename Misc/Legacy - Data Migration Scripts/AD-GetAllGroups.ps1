@@ -1,0 +1,1 @@
+﻿Get-ADGroup -Filter * -Properties * | Export-Clixml "C:\WorkFolder\All_Groups.xml"
