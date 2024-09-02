@@ -6,7 +6,7 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-$pfVersion = "v2024.08.26"
+$pfVersion = "v2024.09.02"
 
 Write-Host "`nPassword Functions  $($pfVersion)"
 Write-Host "`nList all available functions with: " -NoNewline
@@ -17,17 +17,17 @@ function Get-pfCommands {
     Param ()
 	Write-Host "`nPassword Functions  $($pfVersion)"
 
-	Write-Output "`nThe added commands are:"
-	Write-Output "    Get-pfCommands            - Lists the commands added"
-	Write-Output "	  Set-SQLiteDatabase        - Create the SQLite Database"
-	Write-Output "	  Get-SQLSafeText           - Package the string with SQL escape characters where required"
-	Write-Output "	  Import-Passwords          - Import Passwords from a text file (1 password per line)"
-	Write-Output "	  Find-Passwords            - Find the password given a Hash"
-	Write-Output "	  Add-MissingData           - Add missing data to the database after new fields were added"
-	Write-Output "	  Add-MissingHashes         - Calls 'Add-MissingData' to add just the NT and LM Hashes"
-	Write-Output "	  Add-MissingPasswordLength - Calls 'Add-MissingData' to add the length of the password"
-	Write-Output "	  Find-ExcelPassword        - Attempts to open an Excel spreadsheet using all the passwords from the database"
-	Write-Output "	  Import-COMBPasswords      - Import Passwords from a text file (: seperated file)"
+	Write-Host "`nThe added commands are:"
+	Write-Host "    Get-pfCommands            - Lists the commands added"
+	Write-Host "    Set-SQLiteDatabase        - Create the SQLite Database"
+	Write-Host "    Get-SQLSafeText           - Package the string with SQL escape characters where required"
+	Write-Host "    Import-Passwords          - Import Passwords from a text file (1 password per line)"
+	Write-Host "    Find-Passwords            - Find the password given a Hash"
+	Write-Host "    Add-MissingData           - Add missing data to the database after new fields were added"
+	Write-Host "    Add-MissingHashes         - Calls 'Add-MissingData' to add just the NT and LM Hashes"
+	Write-Host "    Add-MissingPasswordLength - Calls 'Add-MissingData' to add the length of the password"
+	Write-Host "    Find-ExcelPassword        - Attempts to open an Excel spreadsheet using all the passwords from the database"
+	Write-Host "    Import-COMBPasswords      - Import Passwords from a text file (: seperated file)`n"
 }
 
 
@@ -36,10 +36,11 @@ function Get-pfCommands {
 ##########################
 
 # Values are made ReadOnly so they can be removed if required without having to reload the CLI
-Set-Variable pfDigits    -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[0-9]'
-Set-Variable pfLowerCase -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[a-z]'
-Set-Variable pfUpperCase -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[A-Z]'
-Set-Variable pfSpecials  -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[^a-zA-Z0-9]'
+Set-Variable pfDigits      -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[0-9]'
+Set-Variable pfLowerCase   -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[a-z]'
+Set-Variable pfUpperCase   -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[A-Z]'
+Set-Variable pfSpecials    -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value '[^a-zA-Z0-9]'
+Set-Variable pfEmptyLMHash -Force -ErrorAction SilentlyContinue -Option ReadOnly -Value 'aad3b435b51404eeaad3b435b51404ee'
 
 function Set-SQLiteDatabase {
 	Param (
@@ -337,7 +338,7 @@ function Import-Passwords {
 		$SkipEntry         = $FALSE
 		$NTHashError       = $FALSE
 		$LMHashError       = $FALSE
-		$NTHashCode        = ""
+		$NTHashCode        = $pfEmptyLMHash
 		$LMHashCode        = ""
 
 		# Show the progress bar if required
@@ -451,8 +452,8 @@ function Find-Passwords {
 			UID
 			LMHash
 			NTHash
-			<unknown>
-			<unknown>
+			Comment
+			Home Dir
 
 		Each field is seperated with a colon ( : )
 
@@ -770,6 +771,13 @@ function Add-MissingData {
 
 				try   {
 					$LMHashCode = ConvertTo-LMHash -Password $SecurePassword -ErrorAction SilentlyContinue
+
+					if (!$LMHashCode) {
+						# The LMHash generation failed to work which most likely is due to non-latin characters
+						# so populate the field with the LM Hash empty hash
+						$LMHashCode = $pfEmptyLMHash
+					}
+
 					$UpdateQuery = $UpdateQuery.replace('@@MARKER@@,', "LMHash='$($LMHashCode)',@@MARKER@@,")
 				}
 				catch {}
