@@ -6,7 +6,7 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-$pfVersion = "v2024.09.02"
+$pfVersion = "v2024.09.30"
 
 Write-Host "`nPassword Functions  $($pfVersion)"
 Write-Host "`nList all available functions with: " -NoNewline
@@ -48,7 +48,7 @@ function Set-SQLiteDatabase {
 	)
 
 	# Create the tables with the required fields
-	$Query = 'CREATE TABLE "Passwords" ("ID" INTEGER NOT NULL UNIQUE, "Password" TEXT, "PasswordLength" INTEGER, "LMHash" TEXT KEY, "NTHash" TEXT KEY, "LowerCase" INTEGER, "UpperCase" INTEGER, "Digits" INTEGER, "Specials" INTEGER, PRIMARY KEY("ID" AUTOINCREMENT)) STRICT;'
+	$Query = 'CREATE TABLE "Passwords" ("Password" TEXT, "ID" INTEGER NOT NULL UNIQUE, "PasswordLength" INTEGER, "LMHash" TEXT KEY, "NTHash" TEXT KEY, "LowerCase" INTEGER, "UpperCase" INTEGER, "Digits" INTEGER, "Specials" INTEGER, PRIMARY KEY("ID" AUTOINCREMENT)) STRICT;'
 
 	try {
 		Invoke-SqliteQuery -DataSource $SQLiteDB -Query $Query
