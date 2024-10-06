@@ -6,7 +6,7 @@
 Import-Module PSSQLite
 Import-Module DSInternals
 
-$pfVersion = "v2024.09.30"
+$pfVersion = "v2024.10.06"
 
 Write-Host "`nPassword Functions  $($pfVersion)"
 Write-Host "`nList all available functions with: " -NoNewline
@@ -721,8 +721,8 @@ function Add-MissingData {
 
 	# Creste the SQL Search command
 	$SearchQuery = 'SELECT * FROM Passwords WHERE @@MARKER@@'
-	if ($NTHash)         {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "NTHash='' OR @@MARKER@@")}
-	if ($LMHash)         {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "(LMHash='' AND PasswordLength < 15) OR @@MARKER@@")}
+	if ($NTHash)         {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "(NTHash='') OR (NTHash IS NULL) OR @@MARKER@@")}
+	if ($LMHash)         {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "(LMHash='' AND PasswordLength < 15) OR (LMHash IS NULL AND PasswordLength < 15) OR @@MARKER@@")}
 	if ($PasswordLength) {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "(PasswordLength IS NULL) OR @@MARKER@@")}
 	if ($LowerCase)      {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "(LowerCase IS NULL) OR @@MARKER@@")}
 	if ($UpperCase)      {$SearchQuery = $SearchQuery.replace('@@MARKER@@', "(UpperCase IS NULL) OR @@MARKER@@")}
@@ -732,7 +732,7 @@ function Add-MissingData {
 
 	# Work through the database for blanks
 	$SelectedRecord = Invoke-SqliteQuery -DataSource $SQLiteDB -Query $SearchQuery -ErrorAction SilentlyContinue
-
+	
 	# Is there anything to do?
 	while ($SelectedRecord) {
 		# Update the progress variables
